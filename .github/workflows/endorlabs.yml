@@ -1,0 +1,57 @@
+name: Endor Labs Scan
+on:
+  workflow_dispatch:
+    inputs:
+      api:
+        description: "Enter the target Endor Labs API"
+        required: true
+        type: choice
+        default: https://api.endorlabs.com
+        options:
+        - https://api.staging.endorlabs.com
+        - https://api.endorlabs.com
+      tenant_name:
+        description: "Enter your Endor Labs namespace?"
+        required: true
+        type: string
+jobs:
+  scan-repo:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+        - name: Setup namespace Environment Variables
+          run: | 
+            NAMESPACE=$(jq -r '.inputs.tenant_name' $GITHUB_EVENT_PATH)
+            echo "::add-mask::$NAMESPACE" 
+            echo NAMESPACE=$NAMESPACE >> $GITHUB_ENV
+        
+        - name: Checkout Repository
+          uses: actions/checkout@v3
+          
+        - name: Set up Python 3.11
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.11'
+            cache: 'pip'
+    
+        - name: Install dependencies
+          run: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+            
+        - name: Endor Labs Workflow Dispatch
+          if: ${{ github.event_name == 'workflow_dispatch' }}
+          uses: endorlabs/github-action@736c93ea52b002f2ac229aaeb273b102cbf6fe12
+          with:
+            namespace: ${{ github.event.inputs.tenant_name }}
+            scan_summary_output_type: "table"
+            pr: "false"
+            enable_github_action_token: "true"
+            scan_dependencies: "true"
+            scan_secrets: "true"
+            scan_git_logs: "true"
+            additional_args: "--as-default-branch --api=${{ github.event.inputs.api }}"
